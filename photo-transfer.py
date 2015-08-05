@@ -32,8 +32,6 @@ import sqlite3
 
 EXIF_DATE_TAG = 'EXIF DateTimeOriginal'
 DATE_FMT = '%Y-%m-%d-%H-%M-%S'
-TIMESTAMP = '%d-%m-%Y %H:%M:%S - '
-DB_TIMESTAMP_FMT = '%d-%m-%Y %H:%M:%S'
 
 parser = argparse.ArgumentParser(description='Process files.')
 parser.add_argument('-input', required=True, metavar='input_path', help='input path')
@@ -46,26 +44,26 @@ execution_date_str = execution_date.strftime(DATE_FMT)
 LOG_FILE = 'photo-transfer-' + execution_date_str + '.log'
 WARNING_FILE = 'photo-transfer-' + execution_date_str + '.warning'
 ERROR_FILE = 'photo-transfer-' + execution_date_str + '.error'
-DATABASE = 'photos.db'
-SQL_INSERT = 'INSERT INTO photos (original, copy, timestamp) VALUES (?,?,?)'
-SQL_CREATE = 'CREATE TABLE photos (original VARCHAR(512) PRIMARY KEY, copy VARCHAR(512), timestamp VARCHAR(20))'
-SQL_SELECT = 'SELECT * FROM photos WHERE original = ?'
+DATABASE = 'photo-transfer.db'
+SQL_INSERT = 'INSERT INTO photo_transfer (original, copy, timestamp) VALUES (?,?,?)'
+SQL_CREATE = 'CREATE TABLE photo_transfer (original VARCHAR(512) PRIMARY KEY, copy VARCHAR(512), timestamp VARCHAR(30))'
+SQL_SELECT = 'SELECT * FROM photo_transfer WHERE original = ?'
 
 #
 # Log functions
 #
 def log(filename, level, message):
     with open(filename, 'at') as log:
-        print(datetime.now().strftime(TIMESTAMP) + level + ' - ' + message, file=log)
+        print(datetime.now().isoformat(), level, '-', *message, file=log)
 
-def info(message):
+def info(*message):
     log(LOG_FILE, 'INFO', message)
 
-def warning(message):
+def warning(*message):
     log(LOG_FILE, 'WARN', message)
     log(WARNING_FILE, 'WARN', message)
 
-def error(message):
+def error(*message):
     log('ERROR', message)
     log(ERROR_FILE, 'ERROR', message)
 
@@ -83,7 +81,7 @@ def open_database():
         return sqlite3.connect(DATABASE)
 
 def create_database():
-    info('Create DATABASE named ' + DATABASE)
+    info('Create DATABASE named', DATABASE)
     conn = sqlite3.connect(DATABASE)
     curs = conn.cursor()
     curs.execute(SQL_CREATE)
@@ -91,15 +89,15 @@ def create_database():
     return conn
 
 def find_original(connection, original):
-    curs = conn.cursor()
+    curs = connection.cursor()
     curs.execute(SQL_SELECT, (original,))
     result = curs.fetchall()
     return len(result) > 0
 
 def persist_original(connection, original, copy):
-    curs = conn.cursor()
-    curs.execute(SQL_INSERT, (original, copy, datetime.now().strftime(DB_TIMESTAMP_FMT)))
-    conn.commit()
+    curs = connection.cursor()
+    curs.execute(SQL_INSERT, (original, copy, datetime.now().isoformat()))
+    connection.commit()
 
 
 # Find original date of a picture using EXIF original date
@@ -112,7 +110,7 @@ def original_date(file):
                 date_object = datetime.strptime(str(tags[EXIF_DATE_TAG]), "%Y:%m:%d %H:%M:%S")
                 return True, date_object
             except:
-                warning('File ' + file + ' has invalid ' + EXIF_DATE_TAG + '=[' + str(tags[EXIF_DATE_TAG]) + ']')
+                warning('File', file, 'has invalid', EXIF_DATE_TAG, '= [', str(tags[EXIF_DATE_TAG]), ']')
         return False, datetime.fromtimestamp(os.path.getmtime(file))
 
 
@@ -163,15 +161,15 @@ def process_file(full_filename, file, file_date, conn):
     copy = os.path.join(path, file)
     if os.path.exists(copy):
         copy = rename_copy(copy)
-        warning('File ' + full_filename + " already exists in destination, will be renamed to " + copy)
+        warning('File', full_filename, 'already exists in destination, will be renamed to', copy)
     shutil.copy2(full_filename, copy)
     persist_original(conn, full_filename, copy)
-    info('Copied file ' + file + ' to ' + path)
+    info('Copied file ', file, ' to ', path)
 
 
 # Main function
 if __name__ == "__main__":
-    info('### Start parsing path: ' + args.input)
+    info('### Start parsing path :', args.input)
     start = datetime.now().timestamp()
     counter = 0
     processed_counter = 0
@@ -179,15 +177,15 @@ if __name__ == "__main__":
     for root, dirs, files in os.walk(args.input):
         for file in files:
             full_filename = os.path.join(root, file)
-            info('Check file ' + full_filename)
+            info('Check file', full_filename)
             counter = counter + 1
             if should_process(full_filename, conn):
                 from_exif, file_date = original_date(full_filename)
-                info('Select file ' + full_filename + ' date=' + str(file_date) + ' (EXIF=' + str(from_exif) + ')')
+                info('Select file', full_filename, 'date =', str(file_date), 'EXIF =', str(from_exif))
                 process_file(full_filename, file, file_date, conn)
                 processed_counter = processed_counter + 1
     end = datetime.now().timestamp()
     diff = end-start
-    info('### Finished parsing path: ' + args.input)
-    info('### Checked ' + str(counter) + ' files, copied ' + str(processed_counter) + ' files')
-    info('### Processed in : ' + str(diff) + 's')
+    info('### Finished parsing path :', args.input)
+    info('### Checked', str(counter), 'files, copied', str(processed_counter), 'files')
+    info('### Processed in :', str(diff), 's')
