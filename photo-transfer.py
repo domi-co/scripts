@@ -158,7 +158,7 @@ def original_date(filename):
                 date_object = datetime.strptime(str(tags[EXIF_DATE_TAG]), "%Y:%m:%d %H:%M:%S")
                 return True, date_object
             except:
-                warning('File', filename, 'has invalid', EXIF_DATE_TAG, '= [', \
+                warning('File', filename, 'has invalid', EXIF_DATE_TAG, '= [',
                         str(tags[EXIF_DATE_TAG]), ']')
         return False, datetime.fromtimestamp(os.path.getmtime(filename))
 
@@ -242,7 +242,7 @@ if __name__ == "__main__":
             counter += 1
             if should_process(full_filename, conn):
                 from_exif, file_date = original_date(full_filename)
-                info('Select file', full_filename, 'date =', str(file_date), 'EXIF =', \
+                info('Select file', full_filename, 'date =', str(file_date), 'EXIF =',
                      str(from_exif))
                 process_file(full_filename, current_file, file_date, conn)
                 processed_counter += 1
