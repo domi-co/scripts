@@ -22,6 +22,7 @@ end of the filename and the first copy is not overwritten.
 Example :
 * image.jpg becomes image(1).jpg
 * image(1).jpg becomes image(2).jpg
+
 ## Usage
 This scripts takes two arguments :
 * input : input path where all files in directory and subdirectories will be processed
