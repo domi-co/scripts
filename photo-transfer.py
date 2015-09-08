@@ -1,3 +1,4 @@
+#! /usr/bin/env python3.4
 """This scripts takes two arguments :
    input : input path where all files in directory and subdirectories will be processed
    output: output path where all files will be copied
@@ -21,7 +22,7 @@ image.jpg becomes image(1).jpg
 image(1).jpg becomes image(2).jpg
 
 use :
-python3 photo-transfer.py -input /Users/Shared/Photos\ Library.photoslibrary/Masters/ -output /Volumes/photo
+./photo-transfer.py -input /Users/Shared/Photos\ Library.photoslibrary/Masters/ -output /Volumes/photo
 
 Copyright : Dominique Coissard
 Date : 02.08.2015"""
@@ -42,12 +43,11 @@ parser.add_argument('-input', required=True, metavar='input_path', help='input p
 parser.add_argument('-output', required=True, metavar='output_path', help='output path')
 
 args = parser.parse_args()
-execution_date = datetime.now()
-execution_date_str = execution_date.strftime(DATE_FMT)
+execution_date = datetime.now().strftime(DATE_FMT)
 
-LOG_FILE = 'photo-transfer-' + execution_date_str + '.log'
-WARNING_FILE = 'photo-transfer-' + execution_date_str + '.warning'
-ERROR_FILE = 'photo-transfer-' + execution_date_str + '.error'
+LOG_FILE = 'photo-transfer-' + execution_date + '.log'
+WARNING_FILE = 'photo-transfer-' + execution_date + '.warning'
+ERROR_FILE = 'photo-transfer-' + execution_date + '.error'
 DATABASE = 'photo-transfer.db'
 SQL_INSERT = 'INSERT INTO photo_transfer (original, copy, timestamp) VALUES (?,?,?)'
 SQL_CREATE = 'CREATE TABLE photo_transfer (original VARCHAR(512) PRIMARY KEY, copy VARCHAR(512), timestamp VARCHAR(30))'
@@ -58,7 +58,7 @@ SQL_SELECT = 'SELECT * FROM photo_transfer WHERE original = ?'
 #
 def log(filename, level, message):
     """Log a message to the file filename, with sepcific level
-    :param full_filename: filename for the log file
+    :param filename: filename for the log file
     :param level: log level
     :param message: message
     :return: None
@@ -89,14 +89,6 @@ def error(*message):
     log('ERROR', message)
     log(ERROR_FILE, 'ERROR', message)
 
-def should_process(file, connection):
-    """Test if a file has already been processed or not
-    :param file: file to check
-    :param connection: connection to the database
-    :return: true if the file must be copied, false otherwise
-    """
-    return not find_original(connection, file)
-
 
 #
 # Database functions
@@ -116,8 +108,8 @@ def create_database():
     """
     info('Create DATABASE named', DATABASE)
     connection = sqlite3.connect(DATABASE)
-    curs = connection.cursor()
-    curs.execute(SQL_CREATE)
+    cursor = connection.cursor()
+    cursor.execute(SQL_CREATE)
     connection.commit()
     return connection
 
@@ -127,9 +119,9 @@ def find_original(connection, original):
     :param original: file path
     :return: True if found, false otherwise
     """
-    curs = connection.cursor()
-    curs.execute(SQL_SELECT, (original,))
-    result = curs.fetchall()
+    cursor = connection.cursor()
+    cursor.execute(SQL_SELECT, (original,))
+    result = cursor.fetchall()
     return len(result) > 0
 
 def persist_original(connection, original, copy):
@@ -140,8 +132,8 @@ def persist_original(connection, original, copy):
     :param copy: copy file path
     :return: None
     """
-    curs = connection.cursor()
-    curs.execute(SQL_INSERT, (original, copy, datetime.now().isoformat()))
+    cursor = connection.cursor()
+    cursor.execute(SQL_INSERT, (original, copy, datetime.now().isoformat()))
     connection.commit()
 
 
@@ -229,7 +221,7 @@ def process_file(filename, short_filename, date, connection):
     info('Copied file ', short_filename, ' to ', path)
 
 
-if __name__ == "__main__":
+def main():
     info('### Start parsing path :', args.input)
     start = datetime.now().timestamp()
     counter = 0
@@ -240,7 +232,7 @@ if __name__ == "__main__":
             full_filename = os.path.join(root, current_file)
             info('Check file', full_filename)
             counter += 1
-            if should_process(full_filename, conn):
+            if not find_original(conn, full_filename):
                 from_exif, file_date = original_date(full_filename)
                 info('Select file', full_filename, 'date =', str(file_date), 'EXIF =',
                      str(from_exif))
@@ -251,3 +243,6 @@ if __name__ == "__main__":
     info('### Finished parsing path :', args.input)
     info('### Checked', str(counter), 'files, copied', str(processed_counter), 'files')
     info('### Processed in :', str(diff), 's')
+
+if __name__ == "__main__":
+    main()
