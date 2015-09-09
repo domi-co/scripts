@@ -180,13 +180,7 @@ def rename_copy(filename):
     path, basename = os.path.split(filename)
 
     # find and remove extension
-    components = basename.split('.')
-    if len(components) > 1:
-        file_without_extension = components[-2]
-        extension = '.' + components[-1]
-    else:
-        file_without_extension = components[0]
-        extension = ''
+    file_without_extension, extension = os.path.splitext(basename)
 
     # add version to file
     verspattern = '\((\d+)\)$'
@@ -198,6 +192,7 @@ def rename_copy(filename):
     else:
         num_version = 1
 
+    # build and return new filename
     file_without_extension = file_without_extension + '(' + str(num_version) + ')'
     file_with_extension = file_without_extension + extension
     return os.path.join(path, file_with_extension)
@@ -243,6 +238,7 @@ def main():
     info('### Finished parsing path :', args.input)
     info('### Checked', str(counter), 'files, copied', str(processed_counter), 'files')
     info('### Processed in :', str(diff), 's')
+
 
 if __name__ == "__main__":
     main()
