@@ -201,15 +201,16 @@ def rename_copy(filename):
     return os.path.join(path, file_with_extension)
 
 
-def copy_file(filename, short_filename, date, connection, output):
+def copy_file(filename, short_filename, date, connection, outputpath):
     """Copy a file to the correct path, changing its name if it already exists
     :param filename: full filename to be copied
     :param short_filename: base filename without extension
     :param date: file original date
     :param connection: connection to database to persist copy
+    :param outputpath output path for copy
     :return: None
     """
-    path = get_or_create_path(output, date)
+    path = get_or_create_path(outputpath, date)
     copy = os.path.join(path, short_filename)
     if os.path.exists(copy):
         copy = rename_copy(copy)
