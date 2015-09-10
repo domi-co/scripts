@@ -34,23 +34,21 @@ import shutil
 import os
 import re
 import sqlite3
+import sys
 
 EXIF_DATE_TAG = 'EXIF DateTimeOriginal'
-DATE_FMT = '%Y-%m-%d-%H-%M-%S'
+EXIF_DATE_FMT = '%Y:%m:%d %H:%M:%S'
+LOG_DATE_FMT = '%Y-%m-%d-%H-%M-%S'
 
-parser = argparse.ArgumentParser(description='Process files.')
-parser.add_argument('-input', required=True, metavar='input_path', help='input path')
-parser.add_argument('-output', required=True, metavar='output_path', help='output path')
-
-args = parser.parse_args()
-execution_date = datetime.now().strftime(DATE_FMT)
+execution_date = datetime.now().strftime(LOG_DATE_FMT)
 
 LOG_FILE = 'photo-transfer-' + execution_date + '.log'
 WARNING_FILE = 'photo-transfer-' + execution_date + '.warning'
 ERROR_FILE = 'photo-transfer-' + execution_date + '.error'
 DATABASE = 'photo-transfer.db'
 SQL_INSERT = 'INSERT INTO photo_transfer (original, copy, timestamp) VALUES (?,?,?)'
-SQL_CREATE = 'CREATE TABLE photo_transfer (original VARCHAR(512) PRIMARY KEY, copy VARCHAR(512), timestamp VARCHAR(30))'
+SQL_CREATE = 'CREATE TABLE photo_transfer (id INTEGER PRIMARY KEY, original VARCHAR(512), copy VARCHAR(512), timestamp VARCHAR(30))'
+SQL_CREATE_INDEX = 'CREATE INDEX original_idx ON photo_transfer(original)'
 SQL_SELECT = 'SELECT * FROM photo_transfer WHERE original = ?'
 
 #
@@ -86,43 +84,48 @@ def error(*message):
     :param message: message to write on error log file
     :return: None
     """
-    log('ERROR', message)
+    log(LOG_FILE, 'ERROR', message)
     log(ERROR_FILE, 'ERROR', message)
 
 
 #
 # Database functions
 #
-def open_database():
+def open_database(database):
     """Open or crete sqlite3 database
     :return: None
     """
-    if not os.path.exists(DATABASE):
-        return create_database()
+    if not os.path.exists(database):
+        return create_database(database)
     else:
-        return sqlite3.connect(DATABASE)
+        connection = sqlite3.connect(database)
+        connection.row_factory = sqlite3.Row
+        return connection
 
-def create_database():
+def create_database(database):
     """Create database for storing processed files.
     :return: connection to the database
     """
-    info('Create DATABASE named', DATABASE)
-    connection = sqlite3.connect(DATABASE)
+    info('Create database named', database)
+    connection = sqlite3.connect(database)
     cursor = connection.cursor()
     cursor.execute(SQL_CREATE)
+    cursor.execute(SQL_CREATE_INDEX)
     connection.commit()
     return connection
 
-def find_original(connection, original):
-    """Search for a file path in the database.
+def already_copied(connection, original, output):
+    """Search for a file path in the database and check if it has already been
+    copied to output.
     :param connection: connection to the database
     :param original: file path
     :return: True if found, false otherwise
     """
     cursor = connection.cursor()
-    cursor.execute(SQL_SELECT, (original,))
-    result = cursor.fetchall()
-    return len(result) > 0
+    for row in cursor.execute(SQL_SELECT, (original,)):
+        if output in row['copy']:
+            return True
+    return False
 
 def persist_original(connection, original, copy):
     """Store an original file path in the database with the copy path and the current
@@ -147,7 +150,7 @@ def original_date(filename):
         tags = exifread.process_file(file_obj, stop_tag=EXIF_DATE_TAG, details=False)
         if EXIF_DATE_TAG in tags.keys():
             try:
-                date_object = datetime.strptime(str(tags[EXIF_DATE_TAG]), "%Y:%m:%d %H:%M:%S")
+                date_object = datetime.strptime(str(tags[EXIF_DATE_TAG]), EXIF_DATE_FMT)
                 return True, date_object
             except:
                 warning('File', filename, 'has invalid', EXIF_DATE_TAG, '= [',
@@ -198,7 +201,7 @@ def rename_copy(filename):
     return os.path.join(path, file_with_extension)
 
 
-def process_file(filename, short_filename, date, connection):
+def copy_file(filename, short_filename, date, connection, output):
     """Copy a file to the correct path, changing its name if it already exists
     :param filename: full filename to be copied
     :param short_filename: base filename without extension
@@ -206,7 +209,7 @@ def process_file(filename, short_filename, date, connection):
     :param connection: connection to database to persist copy
     :return: None
     """
-    path = get_or_create_path(args.output, date)
+    path = get_or_create_path(output, date)
     copy = os.path.join(path, short_filename)
     if os.path.exists(copy):
         copy = rename_copy(copy)
@@ -216,28 +219,42 @@ def process_file(filename, short_filename, date, connection):
     info('Copied file ', short_filename, ' to ', path)
 
 
-def main():
-    info('### Start parsing path :', args.input)
+def process_path(inputpath, outputpath):
+    info('### Start parsing path :', inputpath)
     start = datetime.now().timestamp()
     counter = 0
     processed_counter = 0
-    conn = open_database()
-    for root, dirs, files in os.walk(args.input):
+    conn = open_database(DATABASE)
+    for root, dirs, files in os.walk(inputpath):
         for current_file in files:
             full_filename = os.path.join(root, current_file)
             info('Check file', full_filename)
             counter += 1
-            if not find_original(conn, full_filename):
+            if not already_copied(conn, full_filename, outputpath):
                 from_exif, file_date = original_date(full_filename)
                 info('Select file', full_filename, 'date =', str(file_date), 'EXIF =',
                      str(from_exif))
-                process_file(full_filename, current_file, file_date, conn)
+                copy_file(full_filename, current_file, file_date, conn, outputpath)
                 processed_counter += 1
     end = datetime.now().timestamp()
     diff = end-start
-    info('### Finished parsing path :', args.input)
+    info('### Finished parsing path :', inputpath)
     info('### Checked', str(counter), 'files, copied', str(processed_counter), 'files')
     info('### Processed in :', str(diff), 's')
+
+
+def main():
+    # check command line arguments
+    parser = argparse.ArgumentParser(description='Process files.')
+    parser.add_argument('-input', required=True, metavar='input_path', help='input path')
+    parser.add_argument('-output', required=True, metavar='output_path', help='output path')
+    args = parser.parse_args()
+    if not os.path.isdir(args.input) or not os.path.isdir(args.output):
+        print('input and output should be valid directories')
+        sys.exit(1)
+
+    # process all files in path
+    process_path(args.input, args.output)
 
 
 if __name__ == "__main__":
