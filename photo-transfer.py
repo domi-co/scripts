@@ -187,16 +187,16 @@ def rename_copy(filename):
 
     # add version to file
     verspattern = '\((\d+)\)$'
-    version = re.search(verspattern, file_without_extension)
-    if version and version.group(1).isdigit():
-        num_version = int(version.group(1))
-        num_version += 1
+    result = re.search(verspattern, file_without_extension)
+    if result:
+        version = int(result.group(1))
+        version += 1
         file_without_extension = file_without_extension.split('(')[0]
     else:
-        num_version = 1
+        version = 1
 
     # build and return new filename
-    file_without_extension = file_without_extension + '(' + str(num_version) + ')'
+    file_without_extension = file_without_extension + '(' + str(version) + ')'
     file_with_extension = file_without_extension + extension
     return os.path.join(path, file_with_extension)
 
