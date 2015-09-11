@@ -186,7 +186,7 @@ def rename_copy(filename):
     file_without_extension, extension = os.path.splitext(basename)
 
     # add version to file
-    verspattern = '\((\d+)\)$'
+    verspattern = r'\((\d+)\)$'
     result = re.search(verspattern, file_without_extension)
     if result:
         version = int(result.group(1))
