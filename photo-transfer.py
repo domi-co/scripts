@@ -1,4 +1,4 @@
-#! /usr/bin/env python3.4
+#! /usr/bin/env python3.5
 """This scripts takes two arguments :
    input : input path where all files in directory and subdirectories will be processed
    output: output path where all files will be copied
@@ -240,9 +240,12 @@ def process_path(inputpath, outputpath):
     end = datetime.now().timestamp()
     diff = end-start
     info('### Finished parsing path :', inputpath)
+    print('Finished parsing path : ', inputpath)
     info('### Checked', str(counter), 'files, copied', str(processed_counter), 'files')
+    print('Checked', str(counter), 'files, copied', str(processed_counter), 'files')
     info('### Processed in :', str(diff), 's')
-
+    print('Processed in :', str(diff), 's')
+    
 
 def main():
     # check command line arguments
