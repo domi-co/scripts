@@ -241,6 +241,7 @@ def process_path(inputpath, outputpath):
                      str(from_exif))
                 copy_file(full_filename, current_file, file_date, conn, outputpath)
                 processed_counter += 1
+    conn.close()
     end = datetime.now().timestamp()
     diff = end-start
     info('### Finished parsing path :', inputpath)
