@@ -158,14 +158,18 @@ def original_date(filename):
         return False, datetime.fromtimestamp(os.path.getmtime(filename))
 
 
-def get_or_create_path(path, date):
+def get_or_create_path(path, date, day=False):
     """Return the path based on path parameter and add year/month/day to it.
     If this path does not exist, it will be created
     :param path: base path
     :param date: date used to compute full path
     :return: full path
     """
-    for subpath in (str(date.year), str(date.month), str(date.day)):
+    if day:
+        path_components = (str(date.year), str(date.month), str(date.day))
+    else:
+        path_components = (str(date.year), str(date.month))
+    for subpath in path_components:
         path = os.path.join(path, subpath)
         if not os.path.isdir(path):
             os.mkdir(path)
@@ -245,7 +249,7 @@ def process_path(inputpath, outputpath):
     print('Checked', str(counter), 'files, copied', str(processed_counter), 'files')
     info('### Processed in :', str(diff), 's')
     print('Processed in :', str(diff), 's')
-    
+
 
 def main():
     # check command line arguments
